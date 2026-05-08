@@ -26,29 +26,52 @@ def check_db_has_data():
         session.close()
 
 if not check_db_has_data():
-    st.info("No data found in the local database. Please upload your Apple Health `export.zip`.")
-    uploaded_file = st.file_uploader("Upload export.zip", type=['zip'])
+    st.info("No data found in the local database. Choose an option to load your Apple Health data.")
 
-    if uploaded_file is not None:
-        with st.spinner("Saving uploaded file..."):
-            os.makedirs("data", exist_ok=True)
-            zip_path = os.path.join("data", "upload.zip")
-            with open(zip_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+    upload_method = st.radio("How would you like to provide your data?",
+                            ("Upload export.zip", "Provide Local Path to Unzipped Folder / export.xml"))
 
-        st.success("File uploaded successfully!")
+    if upload_method == "Upload export.zip":
+        uploaded_file = st.file_uploader("Upload export.zip", type=['zip'])
+        if uploaded_file is not None:
+            with st.spinner("Saving uploaded file..."):
+                os.makedirs("data", exist_ok=True)
+                zip_path = os.path.join("data", "upload.zip")
+                with open(zip_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
 
-        if st.button("Process Data"):
-            status_text = st.empty()
-            session = get_session(engine)
-            try:
-                extract_and_parse(zip_path, session, status_text)
-                st.success("Data successfully parsed and saved to database!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-            finally:
-                session.close()
+            st.success("File uploaded successfully!")
+
+            if st.button("Process Data"):
+                status_text = st.empty()
+                session = get_session(engine)
+                try:
+                    extract_and_parse(zip_path, session, status_text, is_zip=True)
+                    st.success("Data successfully parsed and saved to database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+                finally:
+                    session.close()
+
+    else:
+        st.write("Since this app runs locally on your PC, you can simply type the full path to your extracted `apple_health_export` folder or the `export.xml` file directly. This is much faster for large files and bypasses browser upload limits.")
+        local_path = st.text_input("Enter absolute path (e.g., C:\\Users\\Name\\Downloads\\apple_health_export):")
+
+        if local_path and st.button("Process Local Data"):
+            if not os.path.exists(local_path):
+                st.error("Path does not exist. Please check your spelling.")
+            else:
+                status_text = st.empty()
+                session = get_session(engine)
+                try:
+                    extract_and_parse(local_path, session, status_text, is_zip=False)
+                    st.success("Data successfully parsed and saved to database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+                finally:
+                    session.close()
 else:
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Overview", "Metric Deep Dive", "Top Correlations", "Correlation Heatmap", "Settings"])

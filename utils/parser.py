@@ -4,23 +4,36 @@ from datetime import datetime
 from utils.database import HealthRecord
 import os
 
-def extract_and_parse(zip_path, session, status_text=None):
-    extract_dir = "extracted_health_data"
-    os.makedirs(extract_dir, exist_ok=True)
-
+def extract_and_parse(file_path, session, status_text=None, is_zip=True):
     xml_path = None
-    if status_text:
-        status_text.text("Extracting export.xml from zip...")
 
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        for file_info in zip_ref.infolist():
-            if file_info.filename.endswith('export.xml'):
-                zip_ref.extract(file_info, extract_dir)
-                xml_path = os.path.join(extract_dir, file_info.filename)
-                break
+    if is_zip:
+        extract_dir = "extracted_health_data"
+        os.makedirs(extract_dir, exist_ok=True)
+        if status_text:
+            status_text.text("Extracting export.xml from zip...")
 
-    if not xml_path:
-        raise ValueError("export.xml not found in the uploaded zip file.")
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            for file_info in zip_ref.infolist():
+                if file_info.filename.endswith('export.xml'):
+                    zip_ref.extract(file_info, extract_dir)
+                    xml_path = os.path.join(extract_dir, file_info.filename)
+                    break
+
+        if not xml_path:
+            raise ValueError("export.xml not found in the uploaded zip file.")
+    else:
+        # User provided direct path to XML or unzipped folder
+        if os.path.isdir(file_path):
+            potential_path = os.path.join(file_path, 'export.xml')
+            if not os.path.exists(potential_path):
+                potential_path = os.path.join(file_path, 'apple_health_export', 'export.xml')
+            xml_path = potential_path
+        else:
+            xml_path = file_path
+
+        if not xml_path or not os.path.exists(xml_path):
+            raise ValueError(f"export.xml not found at {file_path}")
 
     if status_text:
         status_text.text("Parsing XML and saving to database...")
